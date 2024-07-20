@@ -1,6 +1,7 @@
 from interpreter.stack import Stack
 from interpreter.generator import Generator
 from interpreter.operators import OPERATORS
+from interpreter.compare import COMPARES
 import time
 from collections import deque
 import logging
@@ -239,17 +240,12 @@ class ExecutionLoop:
 
                 case "COMPARE_OP":
                     second, first = self.stack.pop(), self.stack.pop()
-                    COMPARE = {
-                        2: lambda: first < last,
-                        40: lambda: first == last,
-                        92: lambda: first >= last,
-                    }
-                    if self.inst.arg not in COMPARE:
+                    if self.inst.arg not in COMPARES:
                         self.logger.error(
                             f"Invalid COMPARE_OP {self.inst.arg!r} {self.inst.argrepr!r}"
                         )
                         continue
-                    self.stack.append(COMPARE[self.inst.arg]())
+                    self.stack.append(COMPARES[self.inst.arg]())
 
                 case "BINARY_OP":
                     second, first = self.stack.pop(), self.stack.pop()
