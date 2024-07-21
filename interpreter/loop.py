@@ -287,7 +287,7 @@ class ExecutionLoop:
 
                 case "LIST_APPEND":
                     item = self.stack.pop()
-                    self.stack[-self.inst.arg].add(item)
+                    self.stack[-self.inst.arg].append(item)
 
                 case "LIST_EXTEND":
                     seq = self.stack.pop()
