@@ -1,3 +1,6 @@
+from interpreter.debug import currentLoop
+
+
 class Generator:
     def __init__(self, loop):
         self.loop = loop
@@ -11,8 +14,9 @@ class Generator:
         return self
 
     def send(self, value):
-        self.loop.stack.append(value)
-        return self.loop.run()
+        with currentLoop(self.loop):
+            self.loop.stack.append(value)
+            return self.loop.run()
 
     def __next__(self):
         return self.send(None)

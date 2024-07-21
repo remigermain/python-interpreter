@@ -1,23 +1,17 @@
-from interpreter.stack import Stack
+import dis
+import logging
+import time
+from collections import defaultdict, deque
+
+from interpreter.compare import COMPARES
+from interpreter.debug import currentLoop
 from interpreter.generator import Generator
 from interpreter.operators import OPERATORS
-from interpreter.compare import COMPARES
-import time
-from collections import deque
-import logging
-import dis
+from interpreter.stack import Stack
 
 
 class ExecutionLoop:
-    def __init__(
-        self,
-        insts,
-        pointer=0,
-        name=None,
-        co_names=None,
-        co_consts=None,
-        co_varnames=None,
-    ):
+    def __init__(self, insts, name=None, co_names=None, co_consts=None, co_varnames=None, notify=None):
         self.insts = list(reversed(list(insts)))
         self.pointer = len(self.insts) - 1
         self.stack = Stack()
@@ -31,12 +25,16 @@ class ExecutionLoop:
         self.co_consts = list(co_consts or [])
         self.co_varnames = {key: value for key, value in enumerate(co_varnames or [])}
 
-        self.logger = logging.getLogger(name or "Runner")
+        self.logger = logging.getLogger(name or "")
 
         # TODO: remove this shit
         self._co_kw = deque(maxlen=1)
 
-        self.sub_loop = None
+        self._notify = defaultdict(set)
+        self._notify.update(notify or {})
+
+    def __repr__(self):
+        return f"<ExecutionLoop name={self.name}>"
 
     def end(self, value):
         return value
@@ -52,27 +50,19 @@ class ExecutionLoop:
         while self.insts[self.pointer].offset > offest:
             self.pointer += 1
 
-    def critical(self):
-        if self.sub_loop:
-            self.sub_loop.critical()
+    def on_notify(self, action, func):
+        self._notify[action].add(func)
 
-        self.logger.critical(f"Loop[{self.name}]")
-        self.logger.critical(f"\tpointer: {len(self.insts) - self.pointer}")
-        self.logger.critical(f"\topname: {self.inst.opname}")
-        self.logger.critical(f"\tinst: {self.inst}")
-        self.logger.critical(f"\tstack: {self.stack}")
-        self.logger.critical(f"\tco_globals: {self.co_globals}")
-        self.logger.critical(f"\tco_locals: {self.co_locals}")
-        self.logger.critical(f"\tco_names: {self.co_names}")
-        self.logger.critical(f"\tco_consts: {self.co_consts}")
-        self.logger.critical(f"\tco_varnames: {self.co_varnames}")
+    def notify(self, action):
+        for action in self._notify[action]:
+            action(self)
 
     def run(self):
         while self.pointer >= 0:
             self.inst = self.insts[self.pointer]
             self.pointer -= 1
 
-            self.logger.debug(f"{self.inst=}")
+            self.notify("INSTRUCTION")
 
             match self.inst.opname:
                 case "POP_TOP":
@@ -121,10 +111,7 @@ class ExecutionLoop:
                     self.stack.append(self.co_varnames[self.inst.arg])
 
                 case "LOAD_GLOBAL":
-                    for store in (
-                        self.co_globals,
-                        self.co_builtins,
-                    ):
+                    for store in (self.co_globals, self.co_builtins):
                         if self.inst.argval in store:
                             self.stack.append(store[self.inst.argval])
                             break
@@ -132,12 +119,7 @@ class ExecutionLoop:
                         raise Exception(f"Can't find {self.inst.argval!r}")
 
                 case "LOAD_NAME":
-                    for store in (
-                        self.co_names,
-                        self.co_locals,
-                        self.co_globals,
-                        self.co_builtins,
-                    ):
+                    for store in (self.co_names, self.co_locals, self.co_globals, self.co_builtins):
                         if self.inst.argval in store:
                             self.stack.append(store[self.inst.argval])
                             break
@@ -153,17 +135,16 @@ class ExecutionLoop:
                 # -----
                 case "MAKE_FUNCTION":
                     bytescode = self.stack.pop()
-
+                    name = "Function: " + self.insts[self.pointer].argval
                     def caller(*ar, **kw):
                         b = ExecutionLoop(
                             dis.Bytecode(bytescode),
                             co_varnames=[*ar, *list(kw.values())],
-                            name=self.insts[self.pointer].argval,
+                            name=name,
+                            notify=self._notify
                         )
-                        self.sub_loop = b
-                        res = b.run()
-                        self.sub_loop = None
-                        return res
+                        with currentLoop(b):
+                            return b.run()
 
                     self.stack.append(caller)
 
@@ -198,11 +179,11 @@ class ExecutionLoop:
                 # conditions instructions
                 # -----
                 case "POP_JUMP_IF_TRUE":
-                    if self.stack.pop() is not True:
+                    if self.stack.pop() is True:
                         self.jump_forward(self.inst, 2)
 
                 case "POP_JUMP_IF_FALSE":
-                    if self.stack.pop() is not False:
+                    if self.stack.pop() is False:
                         self.jump_forward(self.inst, 2)
 
                 case "POP_JUMP_IF_NOT_NONE":
@@ -240,21 +221,23 @@ class ExecutionLoop:
 
                 case "COMPARE_OP":
                     second, first = self.stack.pop(), self.stack.pop()
-                    if self.inst.arg not in COMPARES:
-                        self.logger.error(
-                            f"Invalid COMPARE_OP {self.inst.arg!r} {self.inst.argrepr!r}"
-                        )
-                        continue
-                    self.stack.append(COMPARES[self.inst.arg]())
+                    self.stack.append(COMPARES[self.inst.arg](first, second))
 
                 case "BINARY_OP":
                     second, first = self.stack.pop(), self.stack.pop()
-                    if self.inst.arg not in OPERATORS:
-                        self.logger.error(
-                            f"Invalid BINARY_OP {self.inst.arg!r} {self.inst.argrepr!r}"
-                        )
-                        continue
                     self.stack.append(OPERATORS[self.inst.arg](first, second))
+
+                case "UNARY_NOT":
+                    self.stack[-1] = not self.stack[-1]
+
+                case "UNARY_NEGATIVE":
+                    self.stack[-1] = -self.stack[-1]
+
+                case "UNARY_INVERT":
+                    self.stack[-1] = ~self.stack[-1]
+
+                case "GET_LEN":
+                    self.stack.append(len(self.stack[-1]))
 
                 # -----
                 # iter instructions
@@ -290,8 +273,6 @@ class ExecutionLoop:
                     self.stack.append(last.__enter__())
 
                 case _:
-                    self.logger.warning(
-                        "Instruction %r not implemented...", self.inst.opname
-                    )
+                    self.logger.warning("Instruction %r not implemented...", self.inst.opname)
 
         return self.end(self.stack.pop())

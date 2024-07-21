@@ -1,16 +1,68 @@
+import operator
+from enum import UNIQUE, IntEnum, auto, verify
+
+# shift, invert, neg
+
+
+@verify(UNIQUE)
+class INSTRUCTION(IntEnum):
+    ADD = 0
+    AND = 1
+    FLOORDIV = 2
+    LEFT_SHIFT = 3
+    MATMULT = 4
+    MULT = 5
+    MOD = 6
+    OR = 7
+    POW = 8
+    RIGHT_SHIFT = 9
+    SUB = 10
+    DIV = 11
+    XOR = 12
+
+    # I ADD
+    IADD = 13
+    IAND = 14
+    IFLOORDIV = 15
+    ILEFT_SHIFT = 16
+    IMATMULT = 17
+    IMULT = 18
+    IMOD = 19
+    IOR = 20
+    IPOW = 21
+    IRIGHT_SHIFT = 22
+    ISUB = 23
+    IDIV = 24
+    IXOR = 25
+
+
 OPERATORS = {
-    0: lambda a, b: a + b,
-    1: lambda a, b: a & b,
-    2: lambda a, b: a // b,
-    4: lambda a, b: a @ b,
-    5: lambda a, b: a * b,
-    6: lambda a, b: a % b,
-    7: lambda a, b: a | b,
-    8: lambda a, b: a**b,
-    10: lambda a, b: a - b,
-    12: lambda a, b: a ^ b,
+    INSTRUCTION.ADD: lambda a, b: a + b,
+    INSTRUCTION.AND: lambda a, b: a & b,
+    INSTRUCTION.FLOORDIV: lambda a, b: a // b,
+    INSTRUCTION.LEFT_SHIFT: lambda a, b: a << b,
+    INSTRUCTION.MATMULT: lambda a, b: a @ b,
+    INSTRUCTION.MULT: lambda a, b: a * b,
+    INSTRUCTION.MOD: lambda a, b: a % b,
+    INSTRUCTION.OR: lambda a, b: a | b,
+    INSTRUCTION.POW: lambda a, b: a**b,
+    INSTRUCTION.RIGHT_SHIFT: lambda a, b: a >> b,
+    INSTRUCTION.SUB: lambda a, b: a - b,
+    INSTRUCTION.DIV: lambda a, b: a / b,
+    INSTRUCTION.XOR: lambda a, b: a ^ b,
 }
-# all self operator (iadd, isub, ...ect)
-# is operator code + 13
-for code, func in list(OPERATORS.items()):
-    OPERATORS[code + 13] = func
+
+# ADD i INSTRUCTIONS
+OPERATORS[INSTRUCTION.IADD] = OPERATORS[INSTRUCTION.ADD]
+OPERATORS[INSTRUCTION.IAND] = OPERATORS[INSTRUCTION.AND]
+OPERATORS[INSTRUCTION.IFLOORDIV] = OPERATORS[INSTRUCTION.FLOORDIV]
+OPERATORS[INSTRUCTION.ILEFT_SHIFT] = OPERATORS[INSTRUCTION.LEFT_SHIFT]
+OPERATORS[INSTRUCTION.IMATMULT] = OPERATORS[INSTRUCTION.MATMULT]
+OPERATORS[INSTRUCTION.IMULT] = OPERATORS[INSTRUCTION.MULT]
+OPERATORS[INSTRUCTION.IMOD] = OPERATORS[INSTRUCTION.MOD]
+OPERATORS[INSTRUCTION.IOR] = OPERATORS[INSTRUCTION.OR]
+OPERATORS[INSTRUCTION.IPOW] = OPERATORS[INSTRUCTION.POW]
+OPERATORS[INSTRUCTION.IRIGHT_SHIFT] = OPERATORS[INSTRUCTION.RIGHT_SHIFT]
+OPERATORS[INSTRUCTION.ISUB] = OPERATORS[INSTRUCTION.SUB]
+OPERATORS[INSTRUCTION.IDIV] = OPERATORS[INSTRUCTION.DIV]
+OPERATORS[INSTRUCTION.IXOR] = OPERATORS[INSTRUCTION.XOR]

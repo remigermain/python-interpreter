@@ -3,6 +3,8 @@ Python3.12 bytescodes interpreter writed in python3.12 [see dis](https://docs.py
 ### Usage
 ```
 python3.12 interpreter.py tests.py
+python3.12 interpreter.py tests.py --debug
+python3.12 interpreter.py --help
 ```
 
 ### Instructions
@@ -37,6 +39,9 @@ Cpython Instructions working:
 > - CONTAINS_OP
 > - COMPARE_OP
 > - BINARY_OP
+> - UNARY_NOT
+> - UNARY_NEGATIVE
+> - UNARY_INVERT
 > - GET_ITER
 > - FOR_ITER
 > - END_FOR

@@ -1,8 +1,10 @@
-import dis
 import argparse
-from interpreter.loop import ExecutionLoop
+import dis
 import logging
 import sys
+
+from interpreter.debug import critical_logger, currentLoop, debug_visual
+from interpreter.loop import ExecutionLoop
 
 
 def main():
@@ -23,9 +25,8 @@ def main():
         default=logging.WARNING,
         choices=logging.getLevelNamesMapping(),
     )
+    parser.add_argument("--debug", help="show instructions debugs", action="store_true", default=False)
     flags = parser.parse_args()
-
-    logging.basicConfig(stream=sys.stdout, level=flags.level)
 
     with open(flags.file) as f:
         content = f.read()
@@ -33,12 +34,19 @@ def main():
     if flags.o:
         with open("output.txt", "w") as f:
             dis.dis(content, file=f)
+    if not flags.debug:
+        logging.basicConfig(stream=sys.stdout, level=flags.level)
+    
+    loop = ExecutionLoop(dis.Bytecode(content), name="MainLoop")
 
-    loop = ExecutionLoop(dis.Bytecode(content), name="Main")
+    loop.on_notify("INSTRUCTION", critical_logger)
+    if flags.debug:
+        loop.on_notify("INSTRUCTION", debug_visual)
     try:
-        loop.run()
+        with currentLoop(loop):
+            loop.run()
     except Exception:
-        loop.critical()
+        critical(loop)
         raise
 
 
