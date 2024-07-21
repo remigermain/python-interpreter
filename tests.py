@@ -1,22 +1,22 @@
-# print("-- for loop range...")
-# for i in range(10):
-#     print(i)
+print("-- for loop range...")
+for i in range(10):
+    print(i)
 
-# print("-- operator...")
-# a = b = c = 1
-# print(a, b, c)
+print("-- operator...")
+a = b = c = 1
+print(a, b, c)
 
-# a += b
-# print(a)
+a += b
+print(a)
 
-# b -= c * 4449
-# print(b)
+b -= c * 4449
+print(b)
 
-# c //= 3
-# print(c)
+c //= 3
+print(c)
 
-# c = a**5 % 3 - 1 & 4 | 6 - 6**888
-# print(c)
+c = a**5 % 3 - 1 & 4 | 6 - 6**888
+print(c)
 
 
 print("-- iterator definition...")
