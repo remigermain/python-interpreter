@@ -3,7 +3,7 @@ Python3.12 bytescodes interpreter writed in python3.12 [see dis](https://docs.py
 ## Working:
 - function definition
 - iterable
-- generator
+- generator ( yield )
 - for-loop / else
 - while / else
 - if / elif / else
@@ -14,7 +14,7 @@ Python3.12 bytescodes interpreter writed in python3.12 [see dis](https://docs.py
 - all operators
 - all compares
 - variables scope
-- comprehension list/tuple/dict
+- comprehension list/tuple/dict/set
 - unpack sequence
 
 ## Not working:
