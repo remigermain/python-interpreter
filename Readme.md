@@ -1,5 +1,31 @@
 Python3.12 bytescodes interpreter writed in python3.12 [see dis](https://docs.python.org/3/library/dis.html)
 
+## Working:
+- function definition
+- iterable
+- generator
+- for-loop / else
+- while / else
+- if / elif / else
+- return
+- f'string
+- call function
+- call attr
+- all operators
+- all compares
+- variables scope
+- comprehension list/tuple/dict
+- unpack sequence
+
+## Not working:
+- class definition
+- super() in class
+- async
+- try / except / else / finally / raise
+- context manager (partial)
+- import module
+- default args/kwargs on functions (partial)
+
 ### Usage
 ```
 python3.12 interpreter.py tests.py
@@ -14,17 +40,20 @@ Cpython Instructions working:
 > - NOP
 > - RESUME
 > - PUSH_NULL
+> - FORMAT_VALUE
 > - RETURN_VALUE
 > - RETURN_CONST
-> - BUILD_LIST
-> - BUILD_TUPLE
 > - STORE_FAST
 > - STORE_GLOBAL
 > - STORE_NAME
+> - STORE_SUBSCR
+> - STORE_SLICE
 > - LOAD_CONST
+> - LOAD_FAST_AND_CLEAR
 > - LOAD_FAST
 > - LOAD_GLOBAL
 > - LOAD_NAME
+> - LOAD_FROM_DICT_OR_GLOBALS
 > - LOAD_ATTR
 > - MAKE_FUNCTION
 > - CALL
@@ -32,8 +61,22 @@ Cpython Instructions working:
 > - POP_JUMP_IF_TRUE
 > - POP_JUMP_IF_FALSE
 > - POP_JUMP_IF_NOT_NONE
+> - POP_JUMP_IF_NONE
 > - JUMP_FORWARD
 > - JUMP_BACKWARD
+> - BUILD_STRING
+> - BUILD_MAP
+> - MAP_ADD
+> - DICT_MERGE
+> - DICT_UPDATE
+> - BUILD_TUPLE
+> - BUILD_LIST
+> - LIST_APPEND
+> - LIST_EXTEND
+> - BUILD_SET
+> - SET_ADD
+> - SET_UPDATE
+> - SWAP
 > - UNPACK_SEQUENCE
 > - IS_OP
 > - CONTAINS_OP
@@ -42,6 +85,13 @@ Cpython Instructions working:
 > - UNARY_NOT
 > - UNARY_NEGATIVE
 > - UNARY_INVERT
+> - GET_LEN
+> - BINARY_SUBSCR
+> - BINARY_SLICE
+> - DELETE_SUBSCR
+> - DELETE_NAME
+> - DELETE_GLOBAL
+> - DELETE_FAST
 > - GET_ITER
 > - FOR_ITER
 > - END_FOR

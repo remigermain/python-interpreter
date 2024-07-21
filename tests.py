@@ -2,6 +2,9 @@ print("-- for loop range...")
 for i in range(10):
     print(i)
 
+print("-- f string...")
+print(f"{i:33.4f} + {5*839} {5} {i}")
+
 print("-- operator...")
 a = b = c = 1
 print(a, b, c)
