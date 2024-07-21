@@ -1,29 +1,39 @@
 import dis
+import inspect
 import logging
-import time
 from collections import defaultdict, deque
 
 from interpreter.compare import COMPARES
 from interpreter.debug import currentLoop
 from interpreter.generator import Generator
 from interpreter.operators import OPERATORS
-from interpreter.stack import Stack
+from interpreter.stack import NULL, Stack
 
 
 class ExecutionLoop:
-    def __init__(self, insts, name=None, co_names=None, co_consts=None, co_varnames=None, notify=None):
+    def __init__(
+        self,
+        insts,
+        name=None,
+        co_globals=None,
+        co_locals=None,
+        co_names=None,
+        co_consts=None,
+        co_varnames=None,
+        notify=None,
+    ):
         self.insts = list(reversed(list(insts)))
         self.pointer = len(self.insts) - 1
         self.stack = Stack()
         self.name = name or "NO-SET"
 
         self.co_builtins = __builtins__
-        self.co_globals = {"time": time}
-        self.co_locals = {}
+        self.co_globals = dict(co_globals or {})
+        self.co_locals = dict(co_locals or {})
         self.co_names = dict(co_names or {})
-
+        self.co_fastlocalnames = {}
         self.co_consts = list(co_consts or [])
-        self.co_varnames = {key: value for key, value in enumerate(co_varnames or [])}
+        self.co_varnames = dict(enumerate(co_varnames or []))
 
         self.logger = logging.getLogger(name or "")
 
@@ -54,8 +64,8 @@ class ExecutionLoop:
         self._notify[action].add(func)
 
     def notify(self, action):
-        for action in self._notify[action]:
-            action(self)
+        for func in self._notify[action]:
+            func(self)
 
     def run(self):
         while self.pointer >= 0:
@@ -70,8 +80,11 @@ class ExecutionLoop:
                 case "COPY":
                     self.stack.append(self.stack[-self.inst.arg])
 
-                case "NOP" | "RESUME" | "PUSH_NULL":
+                case "NOP" | "RESUME":
                     pass
+
+                case "PUSH_NULL":
+                    self.stack.append(NULL)
 
                 case "FORMAT_VALUE":
                     formater = ""
@@ -167,12 +180,15 @@ class ExecutionLoop:
                 # -----
                 case "MAKE_FUNCTION":
                     __bytescode = self.stack.pop()
-                    __name = "Function: " + self.insts[self.pointer].argval
+                    __name = ""
+                    if self.insts[self.pointer].opname == "STORE_NAME":
+                        __name = "Function: " + self.insts[self.pointer].argval
 
                     def caller(*ar, __bytescode=__bytescode, __name=__name, **kw):
                         b = ExecutionLoop(
                             dis.Bytecode(__bytescode),
                             co_varnames=[*ar, *list(kw.values())],
+                            co_globals={**self.co_globals, **self.co_locals, **self.co_names},
                             name=__name,
                             notify=self._notify,
                         )
@@ -197,11 +213,16 @@ class ExecutionLoop:
 
                     caller = self.stack.pop()
 
+                    need_self = False
+                    if self.stack and self.stack[-1] is NULL:
+                        need_self = True
+                        self.stack.pop()
+
                     # TODO remove this shit again
-                    if caller:
-                        result = caller(*args, **kw)
-                    else:
-                        result = None
+                    result = caller(*args, **kw)
+                    # if caller:
+                    # else:
+                    #     result = None
 
                     self.stack.append(result)
 
@@ -388,6 +409,16 @@ class ExecutionLoop:
                 # -----
                 # iter instructions
                 # -----
+                case "GET_YIELD_FROM_ITER":
+                    if all(
+                        (
+                            not inspect.isgenerator(self.stack[-1]),
+                            not inspect.isasyncgen(self.stack[-1]),
+                            not inspect.isawaitable(self.stack[-1]),
+                        )
+                    ):
+                        self.stack[-1] = iter(self.stack[-1])
+
                 case "GET_ITER":
                     self.stack[-1] = iter(self.stack[-1])
 
@@ -416,6 +447,32 @@ class ExecutionLoop:
                     last = self.stack.pop()
                     # push exit for the WITH_EXCEPT_START instruction
                     self.stack.extend((last.__exit__, last.__enter__()))
+
+                case "WITH_EXCEPT_START":
+                    exec_t = self.stack.pop()
+                    exec_v = self.stack.pop()
+                    exec_tb = self.stack.pop()
+
+                    context_exit = self.stack.pop()
+
+                    results = context_exit(exec_t, exec_v, exec_tb)
+
+                    self.stack.append(results)
+
+                # -----
+                # import
+                # -----
+                case "IMPORT_NAME":
+                    fromlist = self.stack.pop()
+                    level = self.stack.pop()
+                    module = __import__(
+                        self.inst.argval, globals=self.co_globals, locals=self.co_locals, fromlist=fromlist, level=level
+                    )
+                    self.stack.append(module)
+
+                case "IMPORT_FROM":
+                    module = self.stack[-1]
+                    self.stack.append(getattr(module, self.inst.argval))
 
                 case _:
                     self.logger.warning("Instruction %r not implemented...", self.inst.opname)

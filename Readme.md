@@ -14,7 +14,7 @@ Python3.12 bytescodes interpreter writed in python3.12 [see dis](https://docs.py
 - all operators
 - all compares
 - variables scope
-- comprehension list/tuple/dict/set
+- comprehension list/dict/set
 - unpack sequence
 
 ## Not working:
@@ -22,9 +22,9 @@ Python3.12 bytescodes interpreter writed in python3.12 [see dis](https://docs.py
 - super() in class
 - async
 - try / except / else / finally / raise
-- context manager (partial)
-- import module
+- context manager (`__exit__` not work)
 - default args/kwargs on functions (partial)
+- comprehension tuple
 
 ### Usage
 ```
@@ -96,5 +96,9 @@ Cpython Instructions working:
 > - FOR_ITER
 > - END_FOR
 > - RETURN_GENERATOR
+> - GET_YIELD_FROM_ITER
 > - YIELD_VALUE
+> - IMPORT_NAME
+> - IMPORT_FROM
 > - BEFORE_WITH
+> - WITH_EXCEPT_START

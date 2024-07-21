@@ -1,5 +1,6 @@
 import os
 import time
+from functools import partial
 
 
 def _format_dict(dtc, name):
@@ -23,7 +24,11 @@ def _format_list(lst, name):
         print(f"\t{v!r},")
     print("]")
 
-def debug_visual(loop):
+
+def debug_visual(loop, step=None):
+    if isinstance(loop, (int, float, str)):
+        return partial(debug_visual, step=loop)
+
     os.system("clear")
 
     print(f"Loop[{loop.name}]")
@@ -36,8 +41,11 @@ def debug_visual(loop):
     _format_dict(loop.co_names, "CoNames")
     _format_list(loop.co_consts, "CoConst")
     _format_dict(loop.co_varnames, "CoVarnames")
-    time.sleep(0.3)
-    print(loop)
+
+    if isinstance(step, str):
+        input()
+    else:
+        time.sleep(step)
 
 
 def critical_logger(loop):
@@ -55,24 +63,24 @@ def critical_logger(loop):
 
 _current_loop = []
 
+
 class currentLoop:
     def __init__(self, loop):
         self._loop = loop
-    
+
     def __enter__(self):
         _current_loop.append(self._loop)
 
     def __exit__(self, exec_t, exec_v, exec_tb):
-        _current_loop
-        del _current_loop[-1]
-
         if exec_v:
             raise
-    
+        global _current_loop
+        del _current_loop[-1]
+
     @staticmethod
     def get():
         return _current_loop[-1]
-    
+
     @staticmethod
     def getAll():
         return _current_loop
