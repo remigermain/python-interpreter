@@ -41,17 +41,16 @@ def debug_visual(loop):
 
 
 def critical_logger(loop):
-    for loop in reversed(currentLoop.getAll()):
-        loop.logger.critical(f"Loop[{loop.name}]")
-        loop.logger.critical(f"\tpointer: {len(loop.insts) - loop.pointer}")
-        loop.logger.critical(f"\topname: {loop.inst.opname}")
-        loop.logger.critical(f"\tinst: {loop.inst}")
-        loop.logger.critical(f"\tstack: {loop.stack}")
-        loop.logger.critical(f"\tco_globals: {loop.co_globals}")
-        loop.logger.critical(f"\tco_locals: {loop.co_locals}")
-        loop.logger.critical(f"\tco_names: {loop.co_names}")
-        loop.logger.critical(f"\tco_consts: {loop.co_consts}")
-        loop.logger.critical(f"\tco_varnames: {loop.co_varnames}\n")
+    loop.logger.critical(f"Loop[{loop.name}]")
+    loop.logger.critical(f"\tpointer: {len(loop.insts) - loop.pointer}")
+    loop.logger.critical(f"\topname: {loop.inst.opname}")
+    loop.logger.critical(f"\tinst: {loop.inst}")
+    loop.logger.critical(f"\tstack: {loop.stack}")
+    loop.logger.critical(f"\tco_globals: {loop.co_globals}")
+    loop.logger.critical(f"\tco_locals: {loop.co_locals}")
+    loop.logger.critical(f"\tco_names: {loop.co_names}")
+    loop.logger.critical(f"\tco_consts: {loop.co_consts}")
+    loop.logger.critical(f"\tco_varnames: {loop.co_varnames}\n")
 
 
 _current_loop = []

@@ -39,15 +39,14 @@ def main():
     
     loop = ExecutionLoop(dis.Bytecode(content), name="MainLoop")
 
-    loop.on_notify("INSTRUCTION", critical_logger)
     if flags.debug:
         loop.on_notify("INSTRUCTION", debug_visual)
     try:
         with currentLoop(loop):
             loop.run()
     except Exception:
-        critical(loop)
-        raise
+        critical_logger(loop)
+        # raise
 
 
 if __name__ == "__main__":
