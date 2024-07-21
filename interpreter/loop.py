@@ -22,9 +22,7 @@ class ExecutionLoop:
         co_varnames=None,
         notify=None,
     ):
-        self.insts = list(reversed(list(insts)))
-        self.pointer = len(self.insts) - 1
-        self.stack = Stack()
+        self.stack = Stack(list(reversed(list(insts))))
         self.name = name or "NO-SET"
 
         self.co_builtins = __builtins__
@@ -49,17 +47,6 @@ class ExecutionLoop:
     def end(self, value):
         return value
 
-    def jump_forward(self, inst, padding):
-        offest = (inst.arg * 2) + padding + inst.offset
-        while self.insts[self.pointer].offset < offest:
-            self.pointer -= 1
-
-    def jump_backward(self, inst, padding):
-        offest = inst.offset - (inst.arg * 2 - padding)
-        self.pointer += 1
-        while self.insts[self.pointer].offset > offest:
-            self.pointer += 1
-
     def on_notify(self, action, func):
         self._notify[action].add(func)
 
@@ -68,17 +55,16 @@ class ExecutionLoop:
             func(self)
 
     def run(self):
-        while self.pointer >= 0:
-            self.inst = self.insts[self.pointer]
-            self.pointer -= 1
+        while self.stack:
+            inst = self.stack.next()
 
             self.notify("INSTRUCTION")
 
-            match self.inst.opname:
+            match inst.opname:
                 case "POP_TOP":
                     self.stack.pop()
                 case "COPY":
-                    self.stack.append(self.stack[-self.inst.arg])
+                    self.stack.append(self.stack[-inst.arg])
 
                 case "NOP" | "RESUME":
                     pass
@@ -89,17 +75,18 @@ class ExecutionLoop:
                 case "FORMAT_VALUE":
                     formater = ""
 
-                    if (self.inst.arg & 0x04) == 0x04:
+                    if (inst.arg & 0x04) == 0x04:
                         formater = self.stack.pop()
 
                     value = self.stack.pop()
-                    if (self.inst.arg & 0x03) == 0x00:
+                    if (inst.arg & 0x03) == 0x00:
+                        # dont format
                         pass
-                    elif (self.inst.arg & 0x03) == 0x01:
+                    elif (inst.arg & 0x03) == 0x01:
                         value = str(value)
-                    elif (self.inst.arg & 0x03) == 0x02:
+                    elif (inst.arg & 0x03) == 0x02:
                         value = repr(value)
-                    elif (self.inst.arg & 0x03) == 0x03:
+                    elif (inst.arg & 0x03) == 0x03:
                         value = ascii(value)
 
                     self.stack.append(format(value, formater))
@@ -109,19 +96,19 @@ class ExecutionLoop:
 
                 case "RETURN_CONST":
                     # return self.end(self.co_consts[inst.arg])
-                    return self.end(self.inst.argval)
+                    return self.end(inst.argval)
 
                 # -----
                 # store function
                 # -----
                 case "STORE_FAST":
-                    self.co_varnames[self.inst.arg] = self.stack.pop()
+                    self.co_varnames[inst.arg] = self.stack.pop()
 
                 case "STORE_GLOBAL":
-                    self.co_globals[self.inst.argval] = self.stack.pop()
+                    self.co_globals[inst.argval] = self.stack.pop()
 
                 case "STORE_NAME":
-                    self.co_names[self.inst.argval] = self.stack.pop()
+                    self.co_names[inst.argval] = self.stack.pop()
 
                 case "STORE_SUBSCR":
                     key = self.stack.pop()
@@ -139,40 +126,45 @@ class ExecutionLoop:
                 # load function
                 # -----
                 case "LOAD_CONST":
-                    self.stack.append(self.inst.argval)
+                    self.stack.append(inst.argval)
 
                 case "LOAD_FAST_AND_CLEAR":
-                    self.stack.append(self.co_varnames.pop(self.inst.arg, None))
+                    self.stack.append(self.co_varnames.pop(inst.arg, None))
 
                 case "LOAD_FAST":
-                    self.stack.append(self.co_varnames[self.inst.arg])
+                    self.stack.append(self.co_varnames[inst.arg])
 
                 case "LOAD_GLOBAL":
                     for store in (self.co_globals, self.co_builtins):
-                        if self.inst.argval in store:
-                            self.stack.append(store[self.inst.argval])
+                        if inst.argval in store:
+                            self.stack.append(store[inst.argval])
                             break
                     else:
-                        raise Exception(f"Can't find {self.inst.argval!r}")
+                        raise Exception(f"Can't find {inst.argval!r}")
 
                 case "LOAD_NAME":
-                    for store in (self.co_names, self.co_locals, self.co_globals, self.co_builtins):
-                        if self.inst.argval in store:
-                            self.stack.append(store[self.inst.argval])
+                    for store in (
+                        self.co_names,
+                        self.co_locals,
+                        self.co_globals,
+                        self.co_builtins,
+                    ):
+                        if inst.argval in store:
+                            self.stack.append(store[inst.argval])
                             break
                     else:
-                        raise Exception(f"Can't find {self.inst.argval!r}")
+                        raise Exception(f"Can't find {inst.argval!r}")
 
                 case "LOAD_FROM_DICT_OR_GLOBALS":
                     for store in (self.co_names, self.co_globals, self.co_builtins):
-                        if self.inst.argval in store:
-                            self.stack.append(store[self.inst.argval])
+                        if inst.argval in store:
+                            self.stack.append(store[inst.argval])
                             break
                     else:
-                        raise Exception(f"Can't find {self.inst.argval!r}")
+                        raise Exception(f"Can't find {inst.argval!r}")
 
                 case "LOAD_ATTR":
-                    attr = getattr(self.stack.pop(), self.inst.argval)
+                    attr = getattr(self.stack.pop(), inst.argval)
                     self.stack.append(attr)
 
                 # -----
@@ -181,14 +173,18 @@ class ExecutionLoop:
                 case "MAKE_FUNCTION":
                     __bytescode = self.stack.pop()
                     __name = ""
-                    if self.insts[self.pointer].opname == "STORE_NAME":
-                        __name = "Function: " + self.insts[self.pointer].argval
+                    if self.stack.next_inst.opname == "STORE_NAME":
+                        __name = "Function: " + self.stack.next_inst.argval
 
                     def caller(*ar, __bytescode=__bytescode, __name=__name, **kw):
                         b = ExecutionLoop(
                             dis.Bytecode(__bytescode),
                             co_varnames=[*ar, *list(kw.values())],
-                            co_globals={**self.co_globals, **self.co_locals, **self.co_names},
+                            co_globals={
+                                **self.co_globals,
+                                **self.co_locals,
+                                **self.co_names,
+                            },
                             name=__name,
                             notify=self._notify,
                         )
@@ -200,7 +196,7 @@ class ExecutionLoop:
                 case "CALL":
                     args = []
                     kw = {}
-                    arguements_length = self.inst.argval
+                    arguements_length = inst.argval
                     if self._co_kw:
                         for k in reversed(self._co_kw.pop()):
                             kw[k] = self.stack.pop()
@@ -218,51 +214,47 @@ class ExecutionLoop:
                         need_self = True
                         self.stack.pop()
 
-                    # TODO remove this shit again
                     result = caller(*args, **kw)
-                    # if caller:
-                    # else:
-                    #     result = None
 
                     self.stack.append(result)
 
                 case "KW_NAMES":
-                    self._co_kw.append(self.inst.argval)
+                    self._co_kw.append(inst.argval)
 
                 # -----
                 # conditions instructions
                 # -----
                 case "POP_JUMP_IF_TRUE":
                     if self.stack.pop() is True:
-                        self.jump_forward(self.inst, 2)
+                        self.stack.jump_forward(2)
 
                 case "POP_JUMP_IF_FALSE":
                     if self.stack.pop() is False:
-                        self.jump_forward(self.inst, 2)
+                        self.stack.jump_forward(2)
 
                 case "POP_JUMP_IF_NOT_NONE":
                     if self.stack.pop() is not None:
-                        self.jump_forward(self.inst, 2)
+                        self.stack.jump_forward(2)
 
                 case "POP_JUMP_IF_NONE":
                     if self.stack.pop() is None:
-                        self.jump_forward(self.inst, 2)
+                        self.stack.jump_forward(2)
 
                 # -----
                 # Jump instructions
                 # -----
                 case "JUMP_FORWARD":
-                    self.jump_forward(self.inst, 2)
+                    self.stack.jump_forward(2)
 
                 case "JUMP_BACKWARD":
-                    self.jump_backward(self.inst, 2)
+                    self.stack.jump_backward(2)
 
                 # -----
                 # operator str
                 # -----
                 case "BUILD_STRING":
                     v = ""
-                    for _ in range(self.inst.arg):
+                    for _ in range(inst.arg):
                         v = self.stack.pop() + v
                     self.stack.append(v)
 
@@ -271,29 +263,31 @@ class ExecutionLoop:
                 # -----
                 case "BUILD_MAP":
                     values = []
-                    count = self.inst.arg
+                    count = inst.arg
                     if count:
-                        self.stack, values = self.stack[:-count], self.stack[-count:]
+                        values = self.stack[-count:]
+                        del self.stack[-count:]
                     self.stack.append(dict(values))
 
                 case "MAP_ADD":
                     value = self.stack.pop()
                     key = self.stack.pop()
-                    dtc = self.stack[-self.inst.arg]
+                    dtc = self.stack[-inst.arg]
                     dtc[key] = value
 
                 # dict merge not raise error
                 case "DICT_MERGE" | "DICT_UPDATE":
-                    self.stack[-self.inst.arg].update(self.stack.pop())
+                    self.stack[-inst.arg].update(self.stack.pop())
 
                 # -----
                 # operator TUPLE
                 # -----
                 case "BUILD_TUPLE":
                     values = []
-                    count = self.inst.arg
+                    count = inst.arg
                     if count:
-                        self.stack, values = self.stack[:-count], self.stack[-count:]
+                        values = self.stack[-count:]
+                        del self.stack[-count:]
                     self.stack.append(tuple(values))
 
                 # -----
@@ -301,70 +295,71 @@ class ExecutionLoop:
                 # -----
                 case "BUILD_LIST":
                     values = []
-                    count = self.inst.arg
+                    count = inst.arg
                     if count:
-                        self.stack, values = self.stack[:-count], self.stack[-count:]
+                        values = self.stack[-count:]
+                        del self.stack[-count:]
                     self.stack.append(list(values))
 
                 case "LIST_APPEND":
                     item = self.stack.pop()
-                    self.stack[-self.inst.arg].append(item)
+                    self.stack[-inst.arg].append(item)
 
                 case "LIST_EXTEND":
                     seq = self.stack.pop()
-                    self.stack[-self.inst.arg].extend(seq)
+                    self.stack[-inst.arg].extend(seq)
 
                 # -----
                 # operator SET
                 # -----
                 case "BUILD_SET":
                     values = []
-                    count = self.inst.arg
+                    count = inst.arg
                     if count:
                         self.stack, values = self.stack[:-count], self.stack[-count:]
                     self.stack.append(set(values))
 
                 case "SET_ADD":
                     item = self.stack.pop()
-                    self.stack[-self.inst.arg].add(item)
+                    self.stack[-inst.arg].add(item)
 
                 case "SET_UPDATE":
                     item = self.stack.pop()
-                    self.stack[-self.inst.arg].update(item)
+                    self.stack[-inst.arg].update(item)
 
                 # -----
                 # operator instructions
                 # -----
                 case "SWAP":
-                    value = self.stack[-self.inst.arg]
+                    value = self.stack[-inst.arg]
                     lastvalue = self.stack[-1]
-                    self.stack[-self.inst.arg] = lastvalue
+                    self.stack[-inst.arg] = lastvalue
                     self.stack[-1] = value
 
                 case "UNPACK_SEQUENCE":
-                    self.stack.extend(self.stack.pop()[: -self.inst.arg - 1 : -1])
+                    self.stack.extend(self.stack.pop()[: -inst.arg - 1 : -1])
 
                 case "IS_OP":
                     second, first = self.stack.pop(), self.stack.pop()
-                    if self.inst.arg == 1:
+                    if inst.arg == 1:
                         self.stack.append(first is not second)
                     else:
                         self.stack.append(first is second)
 
                 case "CONTAINS_OP":
                     second, first = self.stack.pop(), self.stack.pop()
-                    if self.inst.arg == 1:
+                    if inst.arg == 1:
                         self.stack.append(first not in second)
                     else:
                         self.stack.append(first in second)
 
                 case "COMPARE_OP":
                     second, first = self.stack.pop(), self.stack.pop()
-                    self.stack.append(COMPARES[self.inst.arg](first, second))
+                    self.stack.append(COMPARES[inst.arg](first, second))
 
                 case "BINARY_OP":
                     second, first = self.stack.pop(), self.stack.pop()
-                    self.stack.append(OPERATORS[self.inst.arg](first, second))
+                    self.stack.append(OPERATORS[inst.arg](first, second))
 
                 case "UNARY_NOT":
                     self.stack[-1] = not self.stack[-1]
@@ -398,13 +393,13 @@ class ExecutionLoop:
                     del container[key]
 
                 case "DELETE_NAME":
-                    self.co_names.pop(self.inst.argval, None)
+                    self.co_names.pop(inst.argval, None)
 
                 case "DELETE_GLOBAL":
-                    self.co_globals.pop(self.inst.argval, None)
+                    self.co_globals.pop(inst.argval, None)
 
                 case "DELETE_FAST":
-                    self.co_varnames.pop(self.inst.argval, None)
+                    self.co_varnames.pop(inst.argval, None)
 
                 # -----
                 # iter instructions
@@ -427,8 +422,8 @@ class ExecutionLoop:
                     try:
                         self.stack.append(next(iterator))
                     except StopIteration:
-                        self.jump_forward(self.inst, 4)
-                        self.stack.append(None)
+                        self.stack.jump_forward(4)
+                        self.stack.append(NULL)
 
                 case "END_FOR":
                     self.stack.pop()
@@ -466,15 +461,21 @@ class ExecutionLoop:
                     fromlist = self.stack.pop()
                     level = self.stack.pop()
                     module = __import__(
-                        self.inst.argval, globals=self.co_globals, locals=self.co_locals, fromlist=fromlist, level=level
+                        inst.argval,
+                        globals=self.co_globals,
+                        locals=self.co_locals,
+                        fromlist=fromlist,
+                        level=level,
                     )
                     self.stack.append(module)
 
                 case "IMPORT_FROM":
                     module = self.stack[-1]
-                    self.stack.append(getattr(module, self.inst.argval))
+                    self.stack.append(getattr(module, inst.argval))
 
                 case _:
-                    self.logger.warning("Instruction %r not implemented...", self.inst.opname)
+                    self.logger.warning(
+                        "Instruction %r not implemented...", inst.opname
+                    )
 
         return self.end(self.stack.pop())

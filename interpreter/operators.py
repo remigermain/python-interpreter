@@ -1,7 +1,4 @@
-import operator
-from enum import UNIQUE, IntEnum, auto, verify
-
-# shift, invert, neg
+from enum import UNIQUE, IntEnum, verify
 
 
 @verify(UNIQUE)
